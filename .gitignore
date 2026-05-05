@@ -1,0 +1,44 @@
+# Local env and secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node (maps/tooling if added later)
+node_modules/
+
+# Logs and runtime
+*.log
+logs/
+
+# Databases / local state
+*.db
+*.sqlite3
+
+# Docker overrides
+docker-compose.override.yml
