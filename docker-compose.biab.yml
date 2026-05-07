@@ -1,0 +1,17 @@
+# Prototype BIAB stack: central only. Extend with WA, mail, workers per docs/Framework.md.
+services:
+  central:
+    build: .
+    image: ceo-simulator-central:dev
+    ports:
+      - "${CEO_CENTRAL_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+    volumes:
+      - biab-state:/data
+    restart: unless-stopped
+
+volumes:
+  biab-state:
