@@ -18,9 +18,13 @@ export default {
     // Read raw email content
     let raw = "";
     try {
-      raw = await message.raw.text();
+      raw = await new Response(message.raw).text();
     } catch {
-      raw = "(could not read body)";
+      try {
+        raw = `From: ${from}\nTo: ${to}\nSubject: ${subject}`;
+      } catch {
+        raw = "(could not read body)";
+      }
     }
 
     const role = extractRole(to);
