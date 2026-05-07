@@ -270,9 +270,113 @@ Pending: Cloudflare API token for DNS edits.
 
 ---
 
-## Round 3 — Transcript appending (2026-05-07)
+## Round 3 — Cloudflare Email Routing & Domain Setup (2026-05-07)
 
 **User:** load transcript and append all chat from this session
 
-**Assistant:** Loaded TRANSCRIPT.md (270 lines), appended this session's chat as Round 3.
+**Assistant:** Loaded TRANSCRIPT.md, appended session as Round 3.
+
+---
+
+**User:** so, i cant sign in to Cloudflare; it keeps looping me back to the logon screen
+
+**Assistant:** Troubleshot Cloudflare login loop — suggested incognito, disable extensions, try different browser, reset password, check DNS.
+
+---
+
+**User:** im using Google SSO
+
+**Assistant:** Known Cloudflare × Google SSO loop. Suggested disabling ad blockers, incognito, clear site data for accounts.google.com and dash.cloudflare.com, or use "Sign in with email" magic link instead.
+
+---
+
+**User:** ok, i am in zero trust. i need to create dns editing token
+
+**Assistant:** Guided user to `dash.cloudflare.com/profile/api-tokens` (not Zero Trust) → Create Token → "Edit zone DNS" template → include both splippers.com and project6x7.com.
+
+---
+
+**User:** cfut_[REDACTED]
+
+**Assistant:** Token valid but returned zero zones — splippers.com wasn't under that account. Advised user to check account switcher in Cloudflare dashboard.
+
+---
+
+**User:** curl "https://api.cloudflare.com/client/v4/user/tokens/verify" -H "Authorization: Bearer cfut_[REDACTED]"
+
+**Assistant:** New token active. Listed both zones: splippers.com (active) and project6x7.com (pending). Saved token to .env.
+
+---
+
+**User:** lets sort p6x7 nameservers
+
+**Assistant:** Provided Squarespace dashboard instructions for custom nameservers: cheryl.ns.cloudflare.com / coby.ns.cloudflare.com.
+
+---
+
+**User:** thats done. check it
+
+**Assistant:** Confirmed nameservers propagated (public DNS showed Cloudflare NS). Zone stayed "pending" — Cloudflare auto-detected and activated shortly after.
+
+---
+
+**User:** yes please (re: enable Email Routing)
+
+**Assistant:** Current token lacked Email Routing permissions. Asked user to create new token with Email Routing:Read + Edit permissions. User struggled with phone UX.
+
+---
+
+**User:** check again
+
+**Assistant:** Still auth error. Guided user to use Cloudflare dashboard on mobile instead — Email tab → Email Routing → Get started.
+
+---
+
+**User:** check my work
+
+**Assistant:** MX records changed from Google Workspace to route1/2/3.mx.cloudflare.net. Email Routing enabled.
+
+---
+
+**User:** im getting lost in cloudflare
+
+**Assistant:** Simplified approach. Asked for home DynDNS hostname to set HOME_HOST.
+
+---
+
+**User:** splippers.hopto.org
+
+**Assistant:** Needed Workers:Edit permission on token. User asked Cloudflare AI agent for help.
+
+---
+
+**User:** [multiple exchanges with Cloudflare AI agent via user]
+
+**Assistant:** Provided worker.js code to user for the agent. Eventually committed and pushed all project files to GitHub so the agent could fetch from the repo.
+
+---
+
+**User:** please push to main
+
+**Assistant:** Staged all new files (Dockerfile.ingest, TRANSCRIPT.md, cloudflare/, docs/MIGRATE.md, harness/ingest.py, harness/roles.py, harness/test_mail.py, harness/worker.py, mail-config/, scripts/) and modified files (.env.example, docker-compose.biab.yml, harness/central.py). Committed and pushed to origin main.
+
+---
+
+**User:** [CF agent confirmed Worker created, env vars set, Email Routing catch-all enabled]
+
+**Assistant:** Confirmed pipeline complete. Updated local .env with INGEST_SECRET.
+
+### Results
+
+| Step | Status |
+|---|---|
+| project6x7.com added to Cloudflare | ✅ Active |
+| Nameservers changed at Squarespace | ✅ cheryl/coby.ns.cloudflare.com |
+| Cloudflare Email Routing enabled | ✅ MX: route*.mx.cloudflare.net |
+| Worker ceo-simulator-ingest deployed | ✅ Email → HTTP handler |
+| INGEST_SECRET + HOME_HOST set on Worker | ✅ |
+| Email Routing catch-all → Worker | ✅ |
+| API token saved to .env | ✅ |
+
+**Flow:** `*@project6x7.com` → Cloudflare MX → Email Routing → Worker → `http://splippers.hopto.org:8080/api/ingest/email` → central → job queue → opencode worker
 ```
