@@ -99,6 +99,16 @@ services:
       - roundcube-data:/var/roundcube/config
     restart: unless-stopped
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ceo-cloudflared
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    depends_on:
+      - central
+    restart: unless-stopped
+
 volumes:
   biab-state:
   mail-data:

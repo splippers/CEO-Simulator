@@ -36,7 +36,8 @@ export default {
     };
 
     const homeHost = env.HOME_HOST || "localhost:8080";
-    const url = `http://${homeHost}/api/ingest/email`;
+    const scheme = env.HOME_SCHEME || "http";
+    const url = `${scheme}://${homeHost}/api/ingest/email`;
 
     try {
       const resp = await fetch(url, {
