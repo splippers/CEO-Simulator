@@ -377,6 +377,8 @@ Pending: Cloudflare API token for DNS edits.
 | INGEST_SECRET + HOME_HOST set on Worker | ✅ |
 | Email Routing catch-all → Worker | ✅ |
 | API token saved to .env | ✅ |
+| Cloudflare Tunnel (piggyback on monya-tunnel) | ✅ ingest.project6x7.com → localhost:8080 |
+| Full pipeline tested | ✅ HTTPS through tunnel → central → job queue |
 
-**Flow:** `*@project6x7.com` → Cloudflare MX → Email Routing → Worker → `http://splippers.hopto.org:8080/api/ingest/email` → central → job queue → opencode worker
+**Flow:** `*@project6x7.com` → Cloudflare MX → Email Routing → Worker → `https://ingest.project6x7.com/api/ingest/email` → Cloudflare Tunnel → `localhost:8080` → central → job queue → opencode worker
 ```
