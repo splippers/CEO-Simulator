@@ -1,7 +1,10 @@
-# Prototype BIAB stack: central only. Extend with WA, mail, workers per docs/Framework.md.
+# BIAB stack: central API + docker-mailserver + ingest + Roundcube + host-side opencode worker.
+# Worker runs on host (opencode CLI needs local install). See scripts/run-worker.sh.
 services:
   central:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ceo-simulator-central:dev
     ports:
       - "${CEO_CENTRAL_PORT:-8080}:8080"
@@ -13,5 +16,92 @@ services:
       - biab-state:/data
     restart: unless-stopped
 
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: ceo-mailserver
+    hostname: mail
+    domainname: "${DOMAIN:-biab.local}"
+    ports:
+      - "${MAIL_SMTP_PORT:-25}:25"
+      - "${MAIL_IMAP_PORT:-143}:143"
+      - "${MAIL_SUBMISSION_PORT:-587}:587"
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - ./mail-config:/tmp/docker-mailserver:ro
+    env_file:
+      - .env
+    environment:
+      ENABLE_RSPAMD: "0"
+      ENABLE_CLAMAV: "0"
+      ENABLE_FAIL2BAN: "0"
+      ENABLE_POSTGREY: "0"
+      ENABLE_SPAMASSASSIN: "0"
+      POSTMASTER_ADDRESS: "postmaster@${DOMAIN:-biab.local}"
+      SSL_TYPE: "self-signed"
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile.ingest
+    image: ceo-simulator-ingest:dev
+    depends_on:
+      - central
+    volumes:
+      - mail-data:/var/mail:ro
+    env_file:
+      - .env
+    environment:
+      CENTRAL_URL: "http://central:8080"
+      MAIL_DIR: "/var/mail"
+    restart: unless-stopped
+
+  roundcubedb:
+    image: mariadb:11
+    container_name: ceo-roundcubedb
+    environment:
+      MARIADB_ROOT_PASSWORD: "${ROUNDCUBE_DB_ROOT_PASS:-roundcube_root}"
+      MARIADB_DATABASE: "${ROUNDCUBE_DB_NAME:-roundcube}"
+      MARIADB_USER: "${ROUNDCUBE_DB_USER:-roundcube}"
+      MARIADB_PASSWORD: "${ROUNDCUBE_DB_PASS:-roundcube_pass}"
+    volumes:
+      - roundcubedb-data:/var/lib/mysql
+    restart: unless-stopped
+
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    container_name: ceo-roundcube
+    depends_on:
+      roundcubedb:
+        condition: service_started
+      mailserver:
+        condition: service_started
+    ports:
+      - "${ROUNDCUBE_PORT:-8081}:80"
+    environment:
+      ROUNDCUBEMAIL_DB_TYPE: mysql
+      ROUNDCUBEMAIL_DB_HOST: roundcubedb
+      ROUNDCUBEMAIL_DB_NAME: "${ROUNDCUBE_DB_NAME:-roundcube}"
+      ROUNDCUBEMAIL_DB_USER: "${ROUNDCUBE_DB_USER:-roundcube}"
+      ROUNDCUBEMAIL_DB_PASSWORD: "${ROUNDCUBE_DB_PASS:-roundcube_pass}"
+      ROUNDCUBEMAIL_DEFAULT_HOST: mail
+      ROUNDCUBEMAIL_DEFAULT_PORT: "143"
+      ROUNDCUBEMAIL_SMTP_SERVER: mail
+      ROUNDCUBEMAIL_SMTP_PORT: "587"
+      ROUNDCUBEMAIL_DES_KEY: "${ROUNDCUBE_DES_KEY}"
+      ROUNDCUBEMAIL_PRODUCT_NAME: "CEO-Simulator Mail"
+      ROUNDCUBEMAIL_SKIN: elastic
+      ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE: "20M"
+    volumes:
+      - roundcube-data:/var/roundcube/config
+    restart: unless-stopped
+
 volumes:
   biab-state:
+  mail-data:
+  mail-state:
+  roundcubedb-data:
+  roundcube-data:

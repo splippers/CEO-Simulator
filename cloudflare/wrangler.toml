@@ -1,0 +1,3 @@
+name = "ceo-simulator-ingest"
+main = "worker.js"
+account_id = "d909bb66e34abb6d169a6693178f9595"

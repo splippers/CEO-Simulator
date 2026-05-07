@@ -1,0 +1,2 @@
+# Allow plain-text IMAP from Docker network (self-signed certs internally)
+ssl = yes
