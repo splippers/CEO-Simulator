@@ -52,6 +52,8 @@ class Job:
             "id": self.id,
             "role": self.role,
             "priority": self.priority,
+            "system_prompt": self.system_prompt,
+            "context": self.context,
             "status": self.status,
             "result": self.result,
             "error": self.error,
