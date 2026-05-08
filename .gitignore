@@ -42,3 +42,6 @@ logs/
 
 # Docker overrides
 docker-compose.override.yml
+
+# AD user export (contains plaintext passwords)
+ad_users.csv
