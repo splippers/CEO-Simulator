@@ -10,11 +10,11 @@ UPN_SUFFIX=${UPN_SUFFIX:-project6x7.com}
 
 # Staff roles: username, display name, mail local part, password
 staff=(
-    "ceo:Aragorn CEO:ceo:ceo123"
-    "cto:Gandalf CTO:cto:cto123"
-    "dev:Frodo Dev:dev:dev123"
-    "ops:Samwise Ops:ops:ops123"
-    "support:Pippin Support:support:support123"
+    "ceo:Aragorn CEO:ceo:Ceo2026!"
+    "cto:Gandalf CTO:cto:Cto2026!"
+    "dev:Frodo Dev:dev:Dev2026!"
+    "ops:Samwise Ops:ops:Ops2026!"
+    "support:Pippin Support:support:Support2026!"
 )
 
 for entry in "${staff[@]}"; do
@@ -27,12 +27,10 @@ for entry in "${staff[@]}"; do
     else
         echo "Creating user: $uname ($display) <$mail>"
         samba-tool user create "$uname" "$pass" \
-            --display-name="$display" \
             --mail-address="$mail" \
             --given-name="$(echo $display | cut -d' ' -f1)" \
             --surname="$(echo $display | cut -d' ' -f2-)" \
-            --userou="OU=Staff,OU=Users" \
-            --use-username-as-mail
+            --use-username-as-cn
 
         samba-tool user setexpiry "$uname" --noexpiry
         echo "  OK: $mail"
