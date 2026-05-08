@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Create staff mail accounts in docker-mailserver.
-# Run after `docker compose up -d` when the mailserver is running.
+# Create staff accounts in Samba AD for mail auth.
+# Run after `docker compose up -d` when samba-ad is running.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -9,34 +9,45 @@ set -a
 [[ -f .env ]] && source .env
 set +a
 
-DOMAIN="${DOMAIN:-biab.local}"
-CONTAINER="ceo-mailserver"
-PASS="${CEO_MAIL_PASS:-ceo123}"
+SAMBA_ADMIN_PASS="${SAMBA_ADMIN_PASS}"
+AD_CONTAINER="ceo-samba-ad"
+UPN_SUFFIX="${DOMAIN:-project6x7.com}"
 
-# Map of local-part → display name
+# Staff roles: local-part:display:password
 declare -A ACCOUNTS=(
-  [ceo]="Aragorn CEO"
-  [cto]="Gandalf CTO"
-  [dev]="Frodo Dev"
-  [ops]="Samwise Ops"
-  [support]="Pippin Support"
+  [ceo]="Aragorn CEO:ceo123"
+  [cto]="Gandalf CTO:cto123"
+  [dev]="Frodo Dev:dev123"
+  [ops]="Samwise Ops:ops123"
+  [support]="Pippin Support:support123"
 )
 
-echo "==> Setting up mail accounts for ${DOMAIN}"
-echo "    password: ${PASS}"
+echo "==> Creating staff accounts in Samba AD (${UPN_SUFFIX})"
 
 for localpart in "${!ACCOUNTS[@]}"; do
-  email="${localpart}@${DOMAIN}"
-  display="${ACCOUNTS[$localpart]}"
+  IFS=':' read -r display pass <<< "${ACCOUNTS[$localpart]}"
+  email="${localpart}@${UPN_SUFFIX}"
+  given="${display%% *}"
+  surname="${display#* }"
+
   echo -n "    ${email} (${display}) ... "
-  if docker exec "${CONTAINER}" setup email add "${email}" "${PASS}" 2>&1; then
-    echo "OK"
+
+  if docker exec "${AD_CONTAINER}" samba-tool user show "${localpart}" &>/dev/null; then
+    echo "ALREADY EXISTS"
   else
-    echo "SKIP (may already exist)"
+    docker exec "${AD_CONTAINER}" samba-tool user create \
+      "${localpart}" "${pass}" \
+      --display-name="${display}" \
+      --mail-address="${email}" \
+      --given-name="${given}" \
+      --surname="${surname}" \
+      --use-username-as-mail 2>&1 | head -1
+    docker exec "${AD_CONTAINER}" samba-tool user setexpiry "${localpart}" --noexpiry
+    echo "    OK"
   fi
 done
 
 echo "==> Done. Accounts:"
 for localpart in "${!ACCOUNTS[@]}"; do
-  echo "    ${localpart}@${DOMAIN} / ${PASS}"
+  echo "    IMAP/SMTP: ${localpart}@${UPN_SUFFIX}"
 done

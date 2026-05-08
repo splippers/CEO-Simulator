@@ -1,0 +1,7 @@
+# Postfix LDAP alias lookup — mail-enabled groups/contacts in AD
+server_host = samba-ad
+search_base = dc=corp,dc=project6x7,dc=com
+bind_dn = cn=Administrator,cn=Users,dc=corp,dc=project6x7,dc=com
+bind_dn_password = ${LDAP_BIND_PW}
+query_filter = (&(objectClass=user)(mail=%s))
+result_attribute = mail

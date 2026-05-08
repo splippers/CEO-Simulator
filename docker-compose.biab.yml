@@ -1,5 +1,5 @@
-# BIAB stack: central API + docker-mailserver + ingest + Roundcube + host-side opencode worker.
-# Worker runs on host (opencode CLI needs local install). See scripts/run-worker.sh.
+# BIAB stack: central API + docker-mailserver + Samba AD DC + ingest + Roundcube + opencode worker.
+# Run scripts/stop-host-services.sh first if host Postfix/Dovecot/Samba are running.
 services:
   central:
     build:
@@ -14,6 +14,35 @@ services:
       PORT: "8080"
     volumes:
       - biab-state:/data
+    restart: unless-stopped
+
+  samba-ad:
+    build:
+      context: .
+      dockerfile: Dockerfile.samba
+    image: ceo-simulator-samba:dev
+    container_name: ceo-samba-ad
+    hostname: dc1
+    domainname: "${AD_REALM_LOWER:-corp.project6x7.com}"
+    env_file:
+      - .env
+    environment:
+      SAMBA_DOMAIN: "${SAMBA_DOMAIN:-corp}"
+      SAMBA_REALM: "${SAMBA_REALM:-CORP.PROJECT6X7.COM}"
+      SAMBA_ADMIN_PASS: "${SAMBA_ADMIN_PASS}"
+      SAMBA_DNS_FORWARDER: "${SAMBA_DNS_FORWARDER:-1.1.1.1}"
+    # DNS (53), Kerberos (88/464), NetBIOS (135/139/445), LDAPS (636), GC (3269)
+    # are available internally on the Docker network. Only LDAP (389) is exposed
+    # for external admin tools.
+    ports:
+      - "${AD_LDAP_PORT:-389}:389/tcp"
+    volumes:
+      - samba-ad-data:/var/lib/samba
+      - samba-ad-config:/etc/samba
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - SYS_TIME
     restart: unless-stopped
 
   mailserver:
@@ -32,6 +61,7 @@ services:
     env_file:
       - .env
     environment:
+      # Disable unneeded services
       ENABLE_RSPAMD: "0"
       ENABLE_CLAMAV: "0"
       ENABLE_FAIL2BAN: "0"
@@ -39,8 +69,30 @@ services:
       ENABLE_SPAMASSASSIN: "0"
       POSTMASTER_ADDRESS: "postmaster@${DOMAIN:-biab.local}"
       SSL_TYPE: "self-signed"
+      ACCOUNT_PROVISIONER: LDAP
+      ENABLE_LDAP: "1"
+      LDAP_SERVER_HOST: samba-ad
+      LDAP_SEARCH_BASE: "dc=corp,dc=project6x7,dc=com"
+      LDAP_BIND_DN: "cn=Administrator,cn=Users,dc=corp,dc=project6x7,dc=com"
+      LDAP_BIND_PW: "${SAMBA_ADMIN_PASS}"
+      LDAP_USERS_DN: "cn=Users"
+      LDAP_GROUPS_DN: "cn=Users"
+      LDAP_QUERY_FILTER_USER: "(&(objectClass=person)(mail=%s))"
+      LDAP_QUERY_FILTER_GROUP: "(&(objectClass=group)(mail=%s))"
+      LDAP_QUERY_FILTER_ALIAS: "(&(objectClass=user)(mail=%s))"
+      LDAP_QUERY_FILTER_DOMAIN: "(&(|(objectClass=domain)(objectClass=domainDNS))(dc=%s))"
+      DOVECOT_LDAP_URIS: "ldap://samba-ad"
+      DOVECOT_LDAP_BASE: "dc=corp,dc=project6x7,dc=com"
+      DOVECOT_LDAP_DN: "cn=Administrator,cn=Users,dc=corp,dc=project6x7,dc=com"
+      DOVECOT_LDAP_DNPASS: "${SAMBA_ADMIN_PASS}"
+      DOVECOT_LDAP_USER_FILTER: "(&(objectClass=person)(mail=%u))"
+      DOVECOT_LDAP_PASS_FILTER: "(&(objectClass=person)(mail=%u))"
+
     cap_add:
       - NET_ADMIN
+    depends_on:
+      samba-ad:
+        condition: service_started
     restart: unless-stopped
 
   ingest:
@@ -99,9 +151,32 @@ services:
       - roundcube-data:/var/roundcube/config
     restart: unless-stopped
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: ceo-simulator-worker:dev
+    container_name: ceo-worker
+    depends_on:
+      - central
+    env_file:
+      - .env
+    environment:
+      CENTRAL_URL: "http://central:8080"
+      WORKER_ID: "opencode-worker"
+      OPENCODE_MODEL: "${OPENCODE_MODEL:-opencode/big-pickle}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-3}"
+      OPENCODE_TIMEOUT: "${OPENCODE_TIMEOUT:-120}"
+    volumes:
+      - opencode-data:/root/.opencode
+    restart: unless-stopped
+
 volumes:
   biab-state:
+  samba-ad-data:
+  samba-ad-config:
   mail-data:
   mail-state:
   roundcubedb-data:
   roundcube-data:
+  opencode-data:

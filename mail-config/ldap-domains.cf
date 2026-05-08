@@ -1,0 +1,7 @@
+# Postfix LDAP domain verification — check domain exists in AD or accept
+server_host = samba-ad
+search_base = dc=corp,dc=project6x7,dc=com
+bind_dn = cn=Administrator,cn=Users,dc=corp,dc=project6x7,dc=com
+bind_dn_password = ${LDAP_BIND_PW}
+query_filter = (&(|(objectClass=domain)(objectClass=domainDNS))(dc=%s))
+result_attribute = dc

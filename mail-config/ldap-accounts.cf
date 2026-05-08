@@ -1,0 +1,12 @@
+# Dovecot LDAP config — authenticate against Samba AD
+hosts = samba-ad:389
+dn = cn=Administrator,cn=Users,dc=corp,dc=project6x7,dc=com
+dnpass = ${LDAP_BIND_PW}
+auth_bind = yes
+base = dc=corp,dc=project6x7,dc=com
+scope = subtree
+user_filter = (&(objectClass=person)(mail=%u))
+pass_filter = (&(objectClass=person)(mail=%u))
+iterate_filter = (&(objectClass=person)(mail=*))
+user_attrs = =home=/var/mail/%Lu,=mail=maildir:/var/mail/%Lu
+pass_attrs = distinguishedName=user,mail=user,userPassword=password

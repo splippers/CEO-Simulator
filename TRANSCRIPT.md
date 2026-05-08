@@ -382,3 +382,97 @@ Pending: Cloudflare API token for DNS edits.
 
 **Flow:** `*@project6x7.com` → Cloudflare MX → Email Routing → Worker → `https://ingest.project6x7.com/api/ingest/email` → Cloudflare Tunnel → `localhost:8080` → central → job queue → opencode worker
 ```
+
+---
+
+## Round 4 — Samba4 AD-DC + LDAP Mail Integration (2026-05-08)
+
+**User:** i need to wire mail up to a samba4 ad-dc
+
+**Assistant:** Asked clarifying questions:
+1. Primary goal → **Full corporate domain** (Samba AD manages users, groups, DNS, policies; mail is one service)
+2. AD realm → **corp.project6x7.com**
+
+Built Samba4 AD-DC integration:
+
+### New files
+| File | Purpose |
+|---|---|
+| `Dockerfile.samba` | Samba4 AD-DC container (debian:bookworm-slim, samba-ad-dc, krb5, bind9) |
+| `scripts/samba-entrypoint.sh` | Entrypoint: provisions domain on first boot (`samba-tool domain provision`), starts Samba foreground |
+| `scripts/create-ad-users.sh` | Creates 5 staff accounts in AD (ceo, cto, dev, ops, support) with mail attributes |
+| `mail-config/ldap-accounts.cf` | Dovecot LDAP config — auth bind against Samba AD via `mail` attribute |
+| `mail-config/ldap-domains.cf` | Postfix LDAP domain verification |
+| `mail-config/ldap-aliases.cf` | Postfix LDAP alias lookup |
+
+### Modified files
+| File | Change |
+|---|---|
+| `docker-compose.biab.yml` | Added `samba-ad` service (dc1.corp.project6x7.com, ports 53/88/389/3268); updated `mailserver` with `ACCOUNT_PROVISIONER=LDAP` and full LDAP env vars |
+| `.env.example` | Added `SAMBA_DOMAIN`, `SAMBA_REALM`, `SAMBA_ADMIN_PASS`, `SAMBA_DNS_FORWARDER` |
+| `scripts/setup-mail.sh` | Rewritten to create AD users via `samba-tool user create` instead of docker-mailserver `setup email add` |
+
+### Architecture
+```
+Samba4 AD-DC (dc1.corp.project6x7.com)
+    ├── LDAP :389 ──→ docker-mailserver (Postfix + Dovecot)
+    │                    ├── Postfix: virtual domain/alias lookups
+    │                    └── Dovecot: auth bind via (mail=%u)
+    ├── Kerberos :88
+    └── DNS :53
+
+Staff AD users: ceo@, cto@, dev@, ops@, support@project6x7.com
+```
+
+### Bootstrap flow
+```
+1. docker compose up -d samba-ad    → provisions CORP.PROJECT6X7.COM realm
+2. docker compose up -d mailserver  → connects to AD via LDAP
+3. docker compose up -d             → rest of stack
+4. scripts/setup-mail.sh            → creates 5 staff accounts in AD
+```
+
+Mail auth now flows through Samba AD: Roundcube → IMAP Dovecot → LDAP bind → Samba AD. No local docker-mailserver accounts needed.
+
+---
+
+**User:** how much system resource is used by Docker now?
+
+**Assistant:** Found 0 Docker containers running, but Dovecot, Postfix, Samba (nmbd/smbd), and the opencode worker were all running **natively on the host** via systemd/host processes — not in Docker. System: 11GB RAM, 8.6GB available.
+
+---
+
+**User:** yes, all CEO-Simulator modules must be containerised
+
+**Assistant:** Containerized everything:
+
+### New files
+| File | Purpose |
+|---|---|
+| `Dockerfile.worker` | Debian slim + opencode CLI + worker.py — containerized job worker |
+| `scripts/stop-host-services.sh` | Stops & disables host dovecot, postfix, nmbd, smbd; verifies ports free |
+
+### Modified files
+| File | Change |
+|---|---|
+| `docker-compose.biab.yml` | Added `worker` service (builds from Dockerfile.worker, depends on central, poll-based); moved from "host-side" to fully containerized |
+| `.env.example` | Added `AD_REALM_LOWER`, updated worker section for container env |
+
+### Full containerized stack
+| Service | Container | Replaces |
+|---|---|---|
+| central | `Dockerfile` → Flask API | — |
+| samba-ad | `Dockerfile.samba` → Samba4 AD DC | Host nmbd/smbd |
+| mailserver | docker-mailserver (Postfix + Dovecot + LDAP) | Host dovecot, postfix |
+| ingest | `Dockerfile.ingest` → Maildir watcher | — |
+| roundcubedb | MariaDB 11 | — |
+| roundcube | Roundcube webmail | — |
+| worker | `Dockerfile.worker` → opencode job runner | Host python process |
+
+### Bootstrap
+```
+1. scripts/stop-host-services.sh     # free ports 25, 143, 389, 445, 53, 88
+2. docker compose build              # build all container images
+3. docker compose up -d              # start full stack
+4. scripts/setup-mail.sh             # create staff in AD
+```
