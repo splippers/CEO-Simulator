@@ -30,7 +30,7 @@ services:
       SAMBA_DOMAIN: "${SAMBA_DOMAIN:-corp}"
       SAMBA_REALM: "${SAMBA_REALM:-CORP.PROJECT6X7.COM}"
       SAMBA_ADMIN_PASS: "${SAMBA_ADMIN_PASS}"
-      SAMBA_DNS_FORWARDER: "${SAMBA_DNS_FORWARDER:-1.1.1.1}"
+      SAMBA_DNS_FORWARDER: "${SAMBA_DNS_FORWARDER:-192.168.1.254}"
     # DNS (53), Kerberos (88/464), NetBIOS (135/139/445), LDAPS (636), GC (3269)
     # are available internally on the Docker network. Only LDAP (389) is exposed
     # for external admin tools.

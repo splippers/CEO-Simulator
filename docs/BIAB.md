@@ -151,6 +151,19 @@ CEO-Simulator gives you the 14 unreads with zero burn. When you do hire, you’r
 
 **That’s Business-in-a-Box.** The business is you, but better trained.
 
+### Samba AD DNS (`samba-ad`)
+
+Authoritative DNS for the AD zone stays on the DC. Names outside that zone are forwarded to **`SAMBA_DNS_FORWARDER`** (default **`192.168.1.254`**, your LAN gateway). Set it in `.env` if your resolver differs.
+
+DHCP should hand clients the **DC listening IP** for DNS (e.g. **`192.168.1.2`** where **`53`** is published in **`docker-compose.biab.yml`**), not only the gateway.
+
+**Verify before calling DNS done** (replace **`192.168.1.2`** / realm with yours):
+
+1. `dig @192.168.1.2 _ldap._tcp.dc._msdcs.CORP.PROJECT6X7.COM. SRV` — AD service records resolve.
+2. `dig @192.168.1.2 example.com A` — confirms recursion via the forwarder.
+
+After changing **`SAMBA_DNS_FORWARDER`**, recreate **`ceo-samba-ad`** or rely on **`scripts/samba-entrypoint.sh`** re-syncing `dns forwarder` when **`smb.conf`** already contains that setting.
+
 ---
 **Next Action**: `docker compose up`. Be Aragorn’s boss.
 

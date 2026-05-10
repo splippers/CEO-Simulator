@@ -4,7 +4,7 @@ set -e
 SAMBA_DOMAIN=${SAMBA_DOMAIN:-corp}
 SAMBA_REALM=${SAMBA_REALM:-CORP.PROJECT6X7.COM}
 SAMBA_ADMIN_PASS=${SAMBA_ADMIN_PASS:-$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 20)}
-SAMBA_DNS_FORWARDER=${SAMBA_DNS_FORWARDER:-1.1.1.1}
+SAMBA_DNS_FORWARDER=${SAMBA_DNS_FORWARDER:-192.168.1.254}
 
 # Check for AD database (sam.ldb) to determine if already provisioned.
 # The samba package installs a default smb.conf, so checking that alone is unreliable.
@@ -32,6 +32,11 @@ if [ ! -f /var/lib/samba/private/sam.ldb ]; then
     echo "Admin password: $SAMBA_ADMIN_PASS"
 else
     echo "=== Samba already provisioned, starting ==="
+fi
+
+# Reapply forwarder from env on every start so .env changes stick without reprovisioning.
+if [ -f /etc/samba/smb.conf ] && grep -q '^[[:space:]]*dns forwarder[[:space:]]*=' /etc/samba/smb.conf; then
+    sed -i "s/^[[:space:]]*dns forwarder = .*/dns forwarder = ${SAMBA_DNS_FORWARDER}/" /etc/samba/smb.conf
 fi
 
 mkdir -p /var/run/samba
